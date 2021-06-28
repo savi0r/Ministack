@@ -78,6 +78,31 @@ To test if the local DNS server or forwarding is working fine, you need to use t
 yum install bind-utils # remember to install it on every compute node as well because we need it later on
 dig arvan.lan
 ```
+
+The VMs will not have any internet access because the default route in them is set to the ip address of our local DNS which is `10.47.100.5` in our case so in order to make sure DNS server act as a router we need to install iptables on it - centos8 does not have it by default - so follow along.
+
+Enable ip forwarding
+
+```
+sysctl -w net.ipv4.ip_forward=1
+```
+
+Installing iptables 
+
+```
+sudo yum install iptables-services -y
+sudo systemctl start iptables
+sudo systemctl enable iptables
+```
+
+Set iptables rules accordingly
+
+```
+iptables -F # flush the default rules
+iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
+```
+
+
 Virtual Machine Host Configuration
 Each virtual machine should be setup identically, with only the hostname and local IP addresses being different. First, since we are putting the VMs on the same network segment as the host machine, we need to setup a network bridge. 
 
@@ -181,25 +206,3 @@ for the sake of test run the script using the following command
 virsh list # you must see your vm name in the ouput
 ```
 
-The machines will not have any internet access because the default route in them is set to the ip address of our local DNS which is `10.47.100.5` in our case so in order to make sure DNS server act as a router we need to install iptables on it - centos8 does not have it by default - so follow along.
-
-Enable ip forwarding
-
-```
-sysctl -w net.ipv4.ip_forward=1
-```
-
-Installing iptables 
-
-```
-sudo yum install iptables-services -y
-sudo systemctl start iptables
-sudo systemctl enable iptables
-```
-
-Set iptables rules accordingly
-
-```
-iptables -F # flush the default rules
-iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
-```
