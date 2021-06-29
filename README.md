@@ -4,7 +4,7 @@ This project is a small scale cloud management solution which basically has thre
 2. Distributed storage
 3. Monitoring
 Through these building blocks you can create VMs seamlessly and manage them via a web API and by utilising distributed storage you are able to live migrate your VMs and provide a highly available service
-![network diagram](img/network-diagram.jpg)
+![network diagram](img/Network-Diagram.jpg)
 
 
 Because we want to run our vms on a bridge mode network so we can access them from other nodes which reside in the same network and based on research and what articles over internet suggest you can't get ip address of vms in bridge mode easily through commands like ` virsh domifaddr [vm_name] ` so we need a dhcp server in place I went with dnsmasq because it provides the functionality of both a DHCP and a DNS server and it is lightweight nature.
