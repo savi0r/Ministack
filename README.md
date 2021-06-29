@@ -510,7 +510,6 @@ Because our compute nodes are seperate from each other and there is no orcherstr
 
 
 Install nginx package using the yum command on CentOS 8
-https://www.cyberciti.biz/faq/how-to-install-and-use-nginx-on-centos-8/
 
 ```
 sudo yum update
@@ -534,7 +533,9 @@ Add the following configuration to your nginx config in the specified fields `su
 Useful resources:
 
 https://www.thekua.com/atwork/2009/04/active-passive-load-balancer-configuration-for-nginx/
+
 https://easycloudsupport.zendesk.com/hc/en-us/articles/360002057472-How-to-Fix-504-Gateway-Timeout-using-Nginx
+
 https://docs.viblast.com/player/cors/cors-on-nginx
 
 ```
