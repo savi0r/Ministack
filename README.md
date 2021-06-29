@@ -241,6 +241,8 @@ At this point we have a virtual IP address which serves our distributed stroage 
 
 ## Virtualization:
 
+### Setting up DNS node:
+
 Because we want to run our vms on a bridge mode network so we can access them from other nodes which reside in the same network and based on research and what articles over internet suggest you can't get ip address of vms in bridge mode easily through commands like ` virsh domifaddr [vm_name] ` so we need a dhcp server in place I went with dnsmasq because it provides the functionality of both a DHCP and a DNS server and it is lightweight nature.
 I prepared a single cpu and 2 GB ram Centos8 ready system for running dnsmasq
 
@@ -345,8 +347,25 @@ iptables -F # flush the default rules
 iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
 ```
 
+### Setting up client node:
 
-Virtual Machine Host Configuration
+I also brought up a client in the network which our virtualization nodes reside so that I can ssh to my VMs through this node , I chose centos8 as my OS and minimum requirement would satisfy our needs.
+Create a ssh key
+
+```
+ssh-keygen
+```
+
+Copy the ssh public key to our compute nodes so that they can copy it to our VMs
+
+```
+#change compute01 and compute02 with your ip addresses
+scp /home/centos/.ssh/id_rsa.public centos@compute01:/home/centos/libvirt-scripts/ssh-keys
+scp /home/centos/.ssh/id_rsa.public centos@compute02:/home/centos/libvirt-scripts/ssh-keys
+```
+
+### Setting up compute nodes:
+
 Each virtual machine should be setup identically, with only the hostname and local IP addresses being different. First, since we are putting the VMs on the same network segment as the host machine, we need to setup a network bridge. 
 
 Bridged mode operates on Layer 2 of the OSI model. When used, all of the guest virtual machines will appear on the same subnet as the host physical machine. The most common use cases for bridged mode include:
@@ -454,3 +473,125 @@ for the sake of test run the script using the following command
 virsh list # you must see your vm name in the ouput
 ```
 
+In order to be able to do migration you need to set make the node names resolvable through these steps: -on each copute node-
+
+```
+vi /etc/hosts#then add these parameters
+10.47.100.3 compute01.novalocal
+10.47.100.4 compute02.novalocal
+```
+
+And then copy **root** user ssh key to another node:  -on each copute node-
+
+```
+#we should create a ssh key if there isn't any
+ssh-keygen
+ssh-copy-id compute02.novalocal
+```
+
+### Setting up load balancer node:
+
+
+Because our compute nodes are seperate from each other and there is no orcherstration in place every one of them can become a single point of failure so I decided to tackle this problem by using redundant systems as if one compute node become the primary node and keep in service until it goes down then another compute node will takes it's place which is simply an active/passive solution. I managed to do it by configuring Nginx as my loadbalancer to the API on every compute node
+
+
+
+```
+####################################
+#
+#          loadbalancer
+#         /           \
+#  Compute Node A Compute Node B
+#    (active)           (passive)
+#
+####################################
+```
+
+
+
+Install nginx package using the yum command on CentOS 8
+https://www.cyberciti.biz/faq/how-to-install-and-use-nginx-on-centos-8/
+
+```
+sudo yum update
+sudo yum install nginx
+```
+
+We also want to make sure that we protect our API from unprivileged users and attackers as well because our API can utilize our resources in any possible way so it is better to be protected. I just made a basic authentication for the sake of demo.
+[for further information check this website.](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-http-basic-authentication/)
+
+```
+mkdir -p /etc/apache2
+sudo htpasswd /etc/apache2/.htpasswd admin # admin is the name of the user , and you must provide a password here
+#make sure the file exists
+cat /etc/apache2/.htpasswd
+```
+
+
+
+Add the following configuration to your nginx config in the specified fields `sudo vi /etc/nginx/nginx.conf`
+
+Useful resources:
+
+https://www.thekua.com/atwork/2009/04/active-passive-load-balancer-configuration-for-nginx/
+https://easycloudsupport.zendesk.com/hc/en-us/articles/360002057472-How-to-Fix-504-Gateway-Timeout-using-Nginx
+https://docs.viblast.com/player/cors/cors-on-nginx
+
+```
+http{
+
+       ............
+       
+	upstream backend {
+	    server 10.47.100.3:8000 fail_timeout=5s max_fails=1; # active node
+            server 10.47.100.4:8000     backup;  #passive node
+	    }
+	#Increase request timeout because one of our request takes about 4 minutes
+        proxy_read_timeout 300;
+        proxy_connect_timeout 300;
+        proxy_send_timeout 300; 
+	............
+	server{
+	............
+#Enable these headers because of CORS problems
+	add_header 'Access-Control-Allow-Credentials' 'true';
+        add_header 'Access-Control-Allow-Headers' 'Authorization,Accept,Origin,DNT,X-Chisel-Proxied-Url,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Content-Range,Range';
+        add_header 'Access-Control-Allow-Methods' 'GET,POST,OPTIONS,PUT,DELETE,PATCH';
+
+        proxy_redirect off;
+        proxy_set_header Host $proxy_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header Access-Control-Allow-Origin *;
+    
+	    
+	    location / {
+	            auth_basic           “Administrator’s Area”;
+	            auth_basic_user_file /etc/apache2/.htpasswd;
+		    proxy_pass http://backend;
+		}
+#for extarcting metrics
+	    location = /stub_status {
+            	    stub_status;
+        	}
+
+	............
+	}
+	............
+}
+```
+
+if SELnux is enabled, change boolean setting. or simply change selinux to disabled mode via `vi /etc/selinux/config/`
+
+```
+setsebool -P httpd_can_network_connect on   
+```
+
+
+Enable and start Nginx server 
+
+```
+sudo systemctl enable nginx
+sudo systemctl start nginx
+#check to see if its running
+curl localhost
+```
