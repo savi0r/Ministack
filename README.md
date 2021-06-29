@@ -896,13 +896,13 @@ Login to your Grafana web page using the ip addr of your machine on port 3000
 
 Add Prometheus as a data source to your Grafana by following [this guide](https://prometheus.io/docs/visualization/grafana/#using)
 
-Import the specified dashboards into your grafana and change them according to your needs.
+Import the specified dashboards into your grafana and change them in order to meet your needs.
 
-**libvirt dashboard graphana:**
+**libvirt dashboard :**
 
 https://grafana.com/grafana/dashboards/13633
 
-**Node exporter dashboard graphana:**
+**Node exporter dashboard :**
 
 https://grafana.com/grafana/dashboards/13702
 
