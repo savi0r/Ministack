@@ -366,6 +366,8 @@ scp /home/centos/.ssh/id_rsa.public centos@compute02:/home/centos/libvirt-script
 
 ### Setting up compute nodes:
 
+[My main resource here was this](https://blog.doublej472.com/post/libvirt-cluster/)
+
 Each virtual machine should be setup identically, with only the hostname and local IP addresses being different. First, since we are putting the VMs on the same network segment as the host machine, we need to setup a network bridge. 
 
 Bridged mode operates on Layer 2 of the OSI model. When used, all of the guest virtual machines will appear on the same subnet as the host physical machine. The most common use cases for bridged mode include:
@@ -734,8 +736,8 @@ The succeding instructions for exporters must be followed on **every node**
 
 https://devopscube.com/monitor-linux-servers-prometheus-node-exporter/
 
-[According to](https://github.com/prometheus/node_exporter)
->Prometheus documentation The node_exporter is designed to monitor the host system. It's not recommended to deploy it as a Docker container because it requires access to the host system. 
+[According to Prometheus documentaion:](https://github.com/prometheus/node_exporter)
+>The node_exporter is designed to monitor the host system. It's not recommended to deploy it as a Docker container because it requires access to the host system. 
 Even though it is feasible to run it as a docker container , I decided to follow best practices and ran node exporter binary files right on top of my compute nodes
 
 Download the latest node exporter package. You should check the Prometheus downloads section for the latest version and update this command to get that package.
@@ -773,7 +775,7 @@ sudo vi /etc/systemd/system/node_exporter.service
 
 Add the following service file content to the service file and save it.
 
-https://medium.com/kartbites/process-level-monitoring-and-alerting-in-prometheus-915ed7508058
+[check this further information.](https://medium.com/kartbites/process-level-monitoring-and-alerting-in-prometheus-915ed7508058)
 
 In order to monitor systemd services I added `--collector.systemd to node exporter`
  
@@ -812,8 +814,6 @@ http://<server-IP>:9100/metrics
 
 On every compute node,
 
-https://github.com/bykvaadm/libvirt_exporter_improved
-
 This exporter connects to any libvirt daemon and exports per-domain metrics related to CPU, memory, disk and network usage. By default, this exporter listens on TCP port 9177.
 
 You can run the exporter using
@@ -822,7 +822,7 @@ You can run the exporter using
 docker run -d -p 9177:9177 -v /run/libvirt/libvirt-sock-ro:/var/run/libvirt/libvirt-sock-ro:ro bykva/libvirt-exporter:1.0
 ```
 
-
+[For further information check this](https://github.com/bykvaadm/libvirt_exporter_improved)
 
 
 
@@ -838,7 +838,6 @@ docker run -d -p 9113:9113 nginx/nginx-prometheus-exporter:0.9.0 -nginx.scrape-u
 
 On all gluster nodes,
 
-https://github.com/gluster/gluster-prometheus
 
 In order to run this exporter we need to install Go first & set GOROOT and GOPATH environment variables.
 
@@ -874,7 +873,7 @@ systemctl start gluster-exporter
 
 ```
 
-
+[For further information check this.](https://github.com/gluster/gluster-prometheus)
 
 
 Because running docker on your nodes will change your network configurations, you have to change this option or you will face seriuos issues in your networking later on - especially in compute nodes - so if you want to stay safe it is better to consider running exporter binaries instead of docker images.
