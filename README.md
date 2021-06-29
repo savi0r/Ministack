@@ -596,3 +596,321 @@ sudo systemctl start nginx
 #check to see if its running
 curl localhost
 ```
+
+## Monitoring:
+
+Prometheus installation:
+
+I used docker for easy installation of Prometheus and Grafana. You also need to install docker on every compute node for libvirt exporter and Nginx node as well.
+
+First set the DNS to Shecan:
+
+```
+vi /etc/resolv.conf
+##add the following
+nameserver 178.22.122.100
+```
+
+Install docker
+
+```
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+
+#check docker installation
+docker --version
+systemctl start docker
+systemctl enable docker
+```
+
+Make your prometheus configuration file in `/home/centos/prometheus.yml`
+
+```
+vi /home/centos/prometheus.yml
+#add the following
+global:
+  scrape_interval:     15s # By default, scrape targets every 15 seconds.
+
+  # Attach these labels to any time series or alerts when communicating with
+  # external systems (federation, remote storage, Alertmanager).
+  external_labels:
+    monitor: 'codelab-monitor'
+
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  # The job name is added as a label `job=<job_name>` to any timeseries scraped from this config.
+  - job_name: 'prometheus'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'computeNode1Libvirt'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['10.47.100.3:9177']
+  - job_name: 'computeNode2Libvirt'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['10.47.100.4:9177']
+      
+  - job_name: 'NodeExporters'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['10.47.100.3:9100']
+      
+  - job_name: 'NodeExporters'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['10.47.100.3:9100']
+        labels:
+          hostname: 'Compute01'
+      - targets: ['10.47.100.4:9100']
+        labels:
+          hostname: 'Compute02'
+      - targets: ['10.47.100.5:9100']
+        labels:
+          hostname: 'DNS&DHCP server'
+      - targets: ['10.47.100.11:9100']
+        labels:
+          hostname: 'Nginx server'
+      - targets: ['192.168.99.101:9100']
+        labels:
+          hostname: 'Gluster-master1'
+      - targets: ['192.168.99.102:9100']
+        labels:
+          hostname: 'Gluster-master2'
+      - targets: ['192.168.99.103:9100']
+        labels:
+          hostname: 'Gluster-master3'
+      - targets: ['localhost:9100']
+        labels:
+          hostname: 'Monitoring'
+
+  - job_name: 'GlusterfsExporters'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 30s
+
+    static_configs:
+      - targets: ['192.168.99.101:9713']
+      - targets: ['192.168.99.102:9713']
+      - targets: ['192.168.99.103:9713']
+
+  - job_name: 'NginxExporters'
+
+    # Override the global default and scrape targets from this job every 5 seconds.
+    scrape_interval: 5s
+
+    static_configs:
+      - targets: ['10.47.100.11:9113']
+
+```
+
+Run Prometheus using your config file by utilising bind mount
+
+```
+docker run --name prometheus -d -p 9090:9090 -v /home/centos/prometheus.yml:/etc/prometheus/prometheus.yml prom/prometheus
+```
+
+The succeding instructions for exporters must be followed on **every node**
+
+**Node exporter:**
+
+https://devopscube.com/monitor-linux-servers-prometheus-node-exporter/
+
+[According to](https://github.com/prometheus/node_exporter)
+>Prometheus documentation The node_exporter is designed to monitor the host system. It's not recommended to deploy it as a Docker container because it requires access to the host system. 
+Even though it is feasible to run it as a docker container , I decided to follow best practices and ran node exporter binary files right on top of my compute nodes
+
+Download the latest node exporter package. You should check the Prometheus downloads section for the latest version and update this command to get that package.
+`https://prometheus.io/download/`
+
+```
+cd /tmp
+curl -LO https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
+```
+
+Unpack the tarbal
+
+```
+tar -xvf node_exporter-1.1.2.linux-amd64.tar.gz
+```
+
+Move the node export binary to /usr/local/bin
+
+```
+sudo mv node_exporter-1.1.2.linux-amd64/node_exporter /usr/local/bin/
+```
+
+Create a Custom Node Exporter Service
+Create a node_exporter user to run the node exporter service.
+
+```
+sudo useradd -rs /bin/false node_exporter
+```
+
+Create a node_exporter service file under systemd.
+
+```
+sudo vi /etc/systemd/system/node_exporter.service
+```
+
+Add the following service file content to the service file and save it.
+
+https://medium.com/kartbites/process-level-monitoring-and-alerting-in-prometheus-915ed7508058
+
+In order to monitor systemd services I added `--collector.systemd to node exporter`
+ 
+```
+[Unit]
+Description=Node Exporter
+After=network.target
+
+[Service]
+User=node_exporter
+Group=node_exporter
+Type=simple
+ExecStart=/usr/local/bin/node_exporter --collector.systemd
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Reload the system daemon and start the node exporter service.
+
+```
+sudo systemctl daemon-reload
+sudo systemctl start node_exporter
+sudo systemctl enable node_exporter
+#make sure it is running in the active state.
+sudo systemctl status node_exporter
+```
+
+You can see all the server metrics by visiting your server URL on /metrics as shown below.
+
+```
+http://<server-IP>:9100/metrics
+```
+
+**libvirt exporter:**
+
+On every compute node,
+
+https://github.com/bykvaadm/libvirt_exporter_improved
+
+This exporter connects to any libvirt daemon and exports per-domain metrics related to CPU, memory, disk and network usage. By default, this exporter listens on TCP port 9177.
+
+You can run the exporter using
+
+```
+docker run -d -p 9177:9177 -v /run/libvirt/libvirt-sock-ro:/var/run/libvirt/libvirt-sock-ro:ro bykva/libvirt-exporter:1.0
+```
+
+
+
+
+
+**Nginx exporter:**
+
+On Nginx node
+
+```
+docker run -d -p 9113:9113 nginx/nginx-prometheus-exporter:0.9.0 -nginx.scrape-uri=http://10.47.100.11/stub_status
+```
+
+**Glusterfs exporter:**
+
+On all gluster nodes,
+
+https://github.com/gluster/gluster-prometheus
+
+In order to run this exporter we need to install Go first & set GOROOT and GOPATH environment variables.
+
+```
+vi /etc/resolv.conf
+nameserver 178.22.122.100
+yum install -y wget
+wget https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
+sudo tar -zxvf go1.15.3.linux-amd64.tar.gz -C /usr/local
+#check if go installed correctly
+go version
+
+mkdir $HOME/work
+mkdir -p $HOME/work/bin/
+echo 'export GOROOT=/usr/local/go' | sudo tee -a /etc/profile
+echo 'export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin/' | sudo tee -a /etc/profile
+echo 'export GOPATH=$HOME/work' | sudo tee -a /etc/profile
+source /etc/profile
+
+
+mkdir -p $GOPATH/src/github.com/gluster
+cd $GOPATH/src/github.com/gluster
+git clone https://github.com/gluster/gluster-prometheus.git
+cd gluster-prometheus
+./scripts/install-reqs.sh
+
+yum install -y make
+make
+make install
+
+systemctl enable gluster-exporter
+systemctl start gluster-exporter
+
+```
+
+
+
+
+Because running docker on your nodes will change your network configurations, you have to change this option or you will face seriuos issues in your networking later on - especially in compute nodes - so if you want to stay safe it is better to consider running exporter binaries instead of docker images.
+
+```
+iptables -P FORWARD ACCEPT
+```
+
+### Grafana:
+
+Install Grafana
+
+```
+docker run -d -p 3000:3000 --name grafana grafana/grafana
+```
+
+Login to your Grafana web page using the ip addr of your machine on port 3000
+`http://193.176.240.83:3000 # change the ip addr with your addr`
+
+
+Add Prometheus as a data source to your Grafana by following [this guide](https://prometheus.io/docs/visualization/grafana/#using)
+
+Import the specified dashboards into your grafana and change them according to your needs.
+
+**libvirt dashboard graphana:**
+
+https://grafana.com/grafana/dashboards/13633
+
+**Node exporter dashboard graphana:**
+
+https://grafana.com/grafana/dashboards/13702
+
+**Glusterfs exporter dashboard:**
+
+https://grafana.com/grafana/dashboards/10041
+
+**Nginx exporter dashboard:**
+
+https://raw.githubusercontent.com/nginxinc/nginx-prometheus-exporter/master/grafana/dashboard.json
