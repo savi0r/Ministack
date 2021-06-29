@@ -601,7 +601,11 @@ curl localhost
 
 ## Monitoring:
 
-Prometheus installation:
+### Prometheus :
+
+I used Prometheus as my main monitoring platform and utilised different exporters based on my needs.
+
+Installing Prometheus:
 
 I used docker for easy installation of Prometheus and Grafana. You also need to install docker on every compute node for libvirt exporter and Nginx node as well.
 
@@ -886,7 +890,9 @@ iptables -P FORWARD ACCEPT
 
 ### Grafana:
 
-Install Grafana
+I used Grafana alongside Prometheus in order to visualize what takes place in my environment, a picture worth a thosand words.
+
+Install Grafana:
 
 ```
 docker run -d -p 3000:3000 --name grafana grafana/grafana
