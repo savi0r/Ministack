@@ -237,6 +237,7 @@ pcs status
 #Bring our standby node back into the cluster
 pcs node unstandby master1
 ```
+At this point we have a virtual IP address which serves our distributed stroage service , with that in hand we can move on to the next stage.
 
 ## Virtualization:
 
