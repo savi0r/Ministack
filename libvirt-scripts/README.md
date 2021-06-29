@@ -58,6 +58,11 @@ Not an actual script, this exports some variables that will be used for some of
 the scripts above. Normally you should only need to edit this file for your
 configuration.
 
+
+``migrate.sh``
+-------------
+Do the live migration, but it needs a bit of work because it is not scalable and I hard coded destination IP address which is fine for two nodes but it is not a good solution for more than two nodes
+
 ``main.py``
 ----------------
 
