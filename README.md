@@ -3,7 +3,9 @@ This project is a small scale cloud management solution which basically has thre
 1. Virtualization
 2. Distributed storage
 3. Monitoring
+
 Through these building blocks you can create VMs seamlessly and manage them via a web API and by utilising distributed storage you are able to live migrate your VMs and provide a highly available service
+
 ![network diagram](img/Network-Diagram.jpg)
 
 
