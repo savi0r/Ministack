@@ -10,6 +10,235 @@ Through these building blocks you can create VMs seamlessly and manage them via 
 
 ![network diagram](img/Network-Diagram.jpg)
 
+## Storage:
+
+We will create a glusterfs cluster as our storage backend and serve files through Ganesha which basically is an abstraction layer to plug in different storage backends. Then we will create a high available cluster out of it using pacemaker and corosync by providing a floating ip in order to reach one of our gluster servers and in case if one of them failed pacemaker and corosync will replace will replace it immediately so users won't notice any outage in our service. This guide is based on the resource provided by Oracle.
+https://oracle.github.io/linux-labs/HA-NFS/
+
+Our components in more detail are :
+    Corosync provides clustering infrastructure to manage which nodes are involved, their communication and quorum
+    Pacemaker manages cluster resources and rules of their behavior
+    Gluster is a scalable and distributed filesystem
+    Ganesha is an NFS server which can use many different backing filesystem types including Gluster
+
+
+Set DNS to Shecan
+
+```
+vi /etc/resolve.conf
+nameserver 178.22.122.100
+```
+
+Install necessary packages
+
+```
+sudo -s
+dnf update
+
+#https://www.server-world.info/en/note?os=CentOS_8&p=glusterfs7&f=4
+
+dnf -y install centos-release-nfs-ganesha30 
+sed -i -e "s/enabled=1/enabled=0/g" /etc/yum.repos.d/CentOS-NFS-Ganesha-3.repo 
+ dnf --enablerepo=centos-nfs-ganesha3 -y install nfs-ganesha-gluster 
+ mv /etc/ganesha/ganesha.conf /etc/ganesha/ganesha.conf.org 
+ 
+ #https://www.server-world.info/en/note?os=CentOS_8&p=pacemaker&f=1
+ 
+dnf --enablerepo=HighAvailability -y install corosync pacemaker pcs 
+
+#https://kifarunix.com/install-and-setup-glusterfs-storage-cluster-on-centos-8/
+
+dnf -y install centos-release-gluster
+dnf config-manager --set-enabled PowerTools
+dnf -y install glusterfs-server
+```
+
+Create the Gluster volume
+I attached a 20GB spare disk to my vms on /dev/vdb so change it with your own spare volume which can be seen through utilising `lsblk` command
+(On all masters) Create an XFS filesystem on /dev/vdb with a label of gluster-000
+
+```
+mkfs.xfs -f -i size=512 -L gluster-000 /dev/vdb
+
+```
+
+(On all masters) Create a mountpoint, add an fstab(5) entry for a disk with the label gluster-000 and mount the filesystem 
+
+```
+mkdir -p /data/glusterfs/sharedvol/mybrick
+echo 'LABEL=gluster-000 /data/glusterfs/sharedvol/mybrick xfs defaults  0 0' >> /etc/fstab
+mount /data/glusterfs/sharedvol/mybrick
+```
+
+(On all masters) Enable and start the Gluster service 
+
+```
+systemctl enable --now glusterd
+```
+
+On master1: Create the Gluster environment by adding peers - I changed /etc/hosts by hand and entered ip addrreses of my nodes to that so that master2 and 3 can be resolvable- 
+
+```
+gluster peer probe master2
+gluster peer probe master3
+#you should see peer probe: success. as the output
+gluster peer status
+#you should see Number of Peers: 2 as the output
+```
+
+Show that our peers have joined the environment
+
+On master2&3:
+```
+gluster peer status
+#you should see Number of Peers: 2 as the output
+```
+
+On master1: Create a Gluster volume named sharedvol which is replicated across our three hosts: master1, master2 and master3. 
+
+```
+gluster volume create sharedvol replica 3 master{1,2,3}:/data/glusterfs/sharedvol/mybrick/brick
+```
+
+On master1: Enable our Gluster volume named sharedvol
+
+```
+gluster volume start sharedvol
+```
+
+Our replicated Gluster volume is now available and can be verified from any master so make sure you see the same output by running this command on every master node
+
+```
+gluster volume info
+```
+
+Configure Ganesha
+
+Ganesha is the NFS server that shares out the Gluster volume. In this example we allow any NFS client to connect to our NFS share with read/write permissions. 
+
+(On all masters) Populate the file /etc/ganesha/ganesha.conf with our configuration 
+
+```
+vi /etc/ganesha/ganesha.conf
+EXPORT{
+    Export_Id = 1 ;       # Unique identifier for each EXPORT (share)
+    Path = "/sharedvol";  # Export path of our NFS share
+
+    FSAL {
+        name = GLUSTER;          # Backing type is Gluster
+        hostname = "localhost";  # Hostname of Gluster server
+        volume = "sharedvol";    # The name of our Gluster volume
+    }
+
+    Access_type = RW;          # Export access permissions
+    Squash = No_root_squash;   # Control NFS root squashing
+    Disable_ACL = FALSE;       # Enable NFSv4 ACLs
+    Pseudo = "/sharedvol";     # NFSv4 pseudo path for our NFS share
+    Protocols = "3","4" ;      # NFS protocols supported
+    Transports = "UDP","TCP" ; # Transport protocols supported
+    SecType = "sys";           # NFS Security flavors supported
+}
+```
+
+Create a Cluster
+
+You will create and start a Pacemaker/Corosync cluster made of our three master nodes
+
+(On all masters) Set a shared password of your choice for the user hacluster
+
+```
+passwd hacluster
+```
+
+(On all masters) Enable the Corosync and Pacemaker services. Enable and start the configuration system service 
+
+```
+systemctl enable corosync
+systemctl enable pacemaker
+systemctl enable --now pcsd
+```
+
+On master1: Authenticate with all cluster nodes using the hacluster user and password defined above
+
+```
+pcs host auth master1 master2 master3 -u hacluster -p examplepassword
+```
+
+On master1: Create a cluster named HA-NFS 
+
+```
+pcs cluster setup HA-NFS master1 master2 master3
+```
+
+On master1: Start the cluster on all nodes 
+
+```
+pcs cluster start --all
+```
+
+On master1: Enable the cluster to run on all nodes at boot time 
+
+```
+pcs cluster enable --all
+``` 
+
+On master1: Disable STONITH 
+based on Wikipedia
+> STONITH ("Shoot The Other Node In The Head" or "Shoot The Offending Node In The Head"), sometimes called STOMITH ("Shoot The Other Member/Machine In The Head"), is a technique for fencing in computer clusters.
+Fencing is the isolation of a failed node so that it does not cause disruption to a computer cluster. As its name suggests, STONITH fences failed nodes by resetting or powering down the failed node. 
+
+```
+pcs property set stonith-enabled=false
+```
+
+Our cluster is now running
+
+On any master by running the following command you should see the same output:
+
+```
+pcs cluster status
+```
+
+Create Cluster services
+
+You will create a Pacemaker resource group that contains the resources necessary to host NFS services from the hostname nfs.vagrant.vm (192.168.99.100)
+
+On master1: Create a systemd based cluster resource to ensure nfs-ganesha is running 
+    
+```
+pcs resource create nfs_server systemd:nfs-ganesha op monitor interval=10s
+```
+
+On master1: Create a IP cluster resource used to present the NFS server 
+
+```
+pcs resource create nfs_ip ocf:heartbeat:IPaddr2 ip=192.168.99.100 cidr_netmask=24 op monitor interval=10s
+```
+
+On master1: Join the Ganesha service and IP resource in a group to ensure they remain together on the same host 
+
+```
+pcs resource group add nfs_group nfs_server nfs_ip
+```
+
+Our service is now running , you can make sure about that by running :
+
+```
+pcs status
+```
+
+You may test the availability of your service by following these steps,
+On master1: Identify the host running the nfs_group resources and put it in standby mode to stop running services
+
+```
+pcs node standby master1
+#Verify that the nfs_group resources have moved to another node
+pcs status
+#Bring our standby node back into the cluster
+pcs node unstandby master1
+```
+
+## Virtualization:
 
 Because we want to run our vms on a bridge mode network so we can access them from other nodes which reside in the same network and based on research and what articles over internet suggest you can't get ip address of vms in bridge mode easily through commands like ` virsh domifaddr [vm_name] ` so we need a dhcp server in place I went with dnsmasq because it provides the functionality of both a DHCP and a DNS server and it is lightweight nature.
 I prepared a single cpu and 2 GB ram Centos8 ready system for running dnsmasq
