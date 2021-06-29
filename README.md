@@ -834,6 +834,8 @@ On Nginx node
 docker run -d -p 9113:9113 nginx/nginx-prometheus-exporter:0.9.0 -nginx.scrape-uri=http://10.47.100.11/stub_status
 ```
 
+[For further information](https://github.com/nginxinc/nginx-prometheus-exporter)
+
 **Glusterfs exporter:**
 
 On all gluster nodes,
