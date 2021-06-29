@@ -439,8 +439,10 @@ Don't use the base image directly! You want to create copies of that file for ea
 
 ```
 sudo su -
-git clone !
-cd libvirt-scripts
+git clone https://github.com/savi0r/Ministack.git
+cd Ministack
+cp -r libvirt-scripts /home/centos/
+cd /home/centos/libvirt-scripts
 ```
 
 for the sake of test run the script using the following command 
