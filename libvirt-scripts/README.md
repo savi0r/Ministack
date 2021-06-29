@@ -57,3 +57,8 @@ static DHCP leases on your DHCP server.
 Not an actual script, this exports some variables that will be used for some of
 the scripts above. Normally you should only need to edit this file for your
 configuration.
+
+``main.py``
+----------------
+
+It is the api which runs on compute nodes for managing VMs.
