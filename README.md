@@ -490,6 +490,36 @@ ssh-keygen
 ssh-copy-id compute02.novalocal
 ```
 
+Introduce the API as a systemd service:
+
+```
+#Create a systemd unit file with these content
+vi /etc/systemd/system/api.service
+
+[Unit]
+Description=VM manager API
+After=multi-user.target
+
+[Service]
+Type=simple
+Restart=always
+ExecStart=/usr/bin/python3 /home/centos/libvirt-scripts/main.py
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Now start & enable API service:
+
+```
+systemctl start api.service
+systemctl enable api.service
+#check the output to make sure there is no error
+systemctl status api.service
+```
+
+
+
 ### Setting up load balancer node:
 
 
