@@ -886,11 +886,11 @@ sudo tar -zxvf go1.15.3.linux-amd64.tar.gz -C /usr/local
 #check if go installed correctly
 go version
 
-mkdir $HOME/work
+
 mkdir -p $HOME/work/bin/
 echo 'export GOROOT=/usr/local/go' | sudo tee -a /etc/profile
-echo 'export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin/' | sudo tee -a /etc/profile
 echo 'export GOPATH=$HOME/work' | sudo tee -a /etc/profile
+echo 'export PATH=$PATH:/usr/local/go/bin:$HOME/work/bin/' | sudo tee -a /etc/profile
 source /etc/profile
 
 
