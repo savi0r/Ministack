@@ -12,8 +12,7 @@ Through these building blocks you can create VMs seamlessly and manage them via 
 
 ## Storage:
 
-We will create a glusterfs cluster as our storage backend and serve files through Ganesha which basically is an abstraction layer to plug in different storage backends. Then we will create a high available cluster out of it using pacemaker and corosync by providing a floating ip in order to reach one of our gluster servers and in case if one of them failed pacemaker and corosync will replace will replace it immediately so users won't notice any outage in our service. This guide is based on the resource provided by Oracle.
-https://oracle.github.io/linux-labs/HA-NFS/
+We will create a glusterfs cluster as our storage backend and serve files through Ganesha which basically is an abstraction layer to plug in different storage backends. Then we will create a high available cluster out of it using pacemaker and corosync by providing a floating ip in order to reach one of our gluster servers and in case if one of them failed pacemaker and corosync will replace will replace it immediately so users won't notice any outage in our service. This guide is based on the resource provided by [Oracle.](https://oracle.github.io/linux-labs/HA-NFS/)
 
 Our components in more detail are :
     Corosync provides clustering infrastructure to manage which nodes are involved, their communication and quorum
@@ -392,7 +391,7 @@ Now setup the IP configuration like your primary networking device, along with y
 ```
 sudo nmcli con modify bridge-br0 ipv4.addresses 10.47.100.3/16
 sudo nmcli con modify bridge-br0 ipv4.gateway 10.47.0.1
-sudo nmcli con modify bridge-br0 ipv4.dns 10.47.0.7
+sudo nmcli con modify bridge-br0 ipv4.dns 10.47.100.5
 sudo nmcli con modify bridge-br0 ipv4.dns-search arvan.lan
 ```
 
