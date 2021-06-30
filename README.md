@@ -201,7 +201,7 @@ pcs cluster status
 
 Create Cluster services
 
-You will create a Pacemaker resource group that contains the resources necessary to host NFS services from the hostname nfs.vagrant.vm (192.168.99.100)
+You will create a Pacemaker resource group that contains the resources necessary to host NFS services from (192.168.99.100)
 
 On master1: Create a systemd based cluster resource to ensure nfs-ganesha is running 
     
