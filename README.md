@@ -522,6 +522,7 @@ We also want to make sure that we protect our API from unprivileged users and at
 [for further information check this website.](https://docs.nginx.com/nginx/admin-guide/security-controls/configuring-http-basic-authentication/)
 
 ```
+yum install -y httpd-tools
 mkdir -p /etc/apache2
 sudo htpasswd /etc/apache2/.htpasswd admin # admin is the name of the user , and you must provide a password here
 #make sure the file exists
