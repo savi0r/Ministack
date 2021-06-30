@@ -44,7 +44,7 @@ sed -i -e "s/enabled=1/enabled=0/g" /etc/yum.repos.d/CentOS-NFS-Ganesha-3.repo
  
  #https://www.server-world.info/en/note?os=CentOS_8&p=pacemaker&f=1
  
-dnf --enablerepo=HighAvailability -y install corosync pacemaker pcs 
+dnf --enablerepo=ha -y install corosync pacemaker pcs 
 
 #https://kifarunix.com/install-and-setup-glusterfs-storage-cluster-on-centos-8/
 
