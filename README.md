@@ -965,3 +965,25 @@ https://grafana.com/grafana/dashboards/10041
 **Nginx exporter dashboard:**
 
 https://raw.githubusercontent.com/nginxinc/nginx-prometheus-exporter/master/grafana/dashboard.json
+
+
+## Usage:
+
+You should enter the public ip of loadbalancer in chrome browser - please take note that if you try to use the api in mozilla you will encounter some errors because of the wait time duration of fetch request - for further information check [here](https://dmitripavlutin.com/timeout-fetch-request/)
+
+The API looks like this:
+
+![API](img/1.png)
+
+You can try to create a VM like this:
+
+![VM creation](img/2.png)
+
+Then you will be provided by an IP address of your vm:
+
+![VM IP](img/3.png)
+
+The other modules can delete or migrate VMs but take note that they only work on the node which you are connected to and you can't delete a VM on another node using this API, so basically these features need improvement.
+
+Finally you can ssh to your client and from there ssh to the IP address of your VM which was provided to you by the API.
+
