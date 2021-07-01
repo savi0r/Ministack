@@ -10,6 +10,20 @@ Through these building blocks you can create VMs seamlessly and manage them via 
 
 ![network diagram](img/Network-Diagram.jpg)
 
+## Network addressing of our environment:
+
+Network group | Node name | IP address
+------------ |------------ | -------------
+Gluster | master1 | 192.168.99.101
+Gluster | master2 | 192.168.99.102
+Gluster | master3 | 192.168.99.103
+Gluster | virtual IP | 192.168.99.100
+Virtualization | compute01 | 10.47.100.3
+Virtualization | compute02 | 10.47.100.4
+Virtualization | DNS server | 10.47.100.5
+Virtualization | loadbalancer | 10.47.100.11
+Monitoring | monitoring | 10.47.100.20 , 192.168.99.8
+
 ## Storage:
 
 We will create a glusterfs cluster as our storage backend and serve files through Ganesha which basically is an abstraction layer to plug in different storage backends. Then we will create a high available cluster out of it using pacemaker and corosync by providing a floating ip in order to reach one of our gluster servers and in case if one of them failed pacemaker and corosync will replace will replace it immediately so users won't notice any outage in our service. This guide is based on the resource provided by [Oracle.](https://oracle.github.io/linux-labs/HA-NFS/)
