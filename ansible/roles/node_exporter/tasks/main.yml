@@ -1,0 +1,3 @@
+---
+- name: include node_exporter.yml
+  include_tasks: node_exporter.yml

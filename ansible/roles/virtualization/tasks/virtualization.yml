@@ -1,0 +1,110 @@
+---
+    - name: downloading docker installation shell script
+      command: curl -fsSL https://get.docker.com -o get-docker.sh
+
+    - name: docker installation
+      command: "sh get-docker.sh"
+    
+    - name: installing pip
+      yum: 
+        name: python-pip
+
+    - name: installing ansible module for managing docker
+      pip: 
+        name: docker
+
+
+    - command: "systemctl start docker"
+    - command: "systemctl enable docker"
+
+    - name: overwrite a conflicting rules written by docker.
+      command: iptables -P FORWARD ACCEPT
+    
+    - name: Yum update the system
+      yum:
+        name: "*"
+        state: latest
+        
+    - name: Ensure needed packages are installed.
+      yum:
+        name:
+          - libvirt-daemon
+          - libvirt-admin 
+          - libvirt-client 
+          - libvirt-daemon-kvm 
+          - libvirt-daemon-driver-qemu 
+          - libvirt-daemon-driver-network
+          - libvirt-daemon-driver-storage 
+          - libvirt-daemon-driver-storage-core
+          - virt-install
+          - nfs-utils
+          - bind-utils
+        state: present
+      
+    - name: Change libvirt default security driver.
+      shell: echo 'security_driver = "none"' >> /etc/libvirt/qemu.conf 
+
+    - name: Start & enable libvirt service.
+      shell: |
+            systemctl enable libvirtd && \
+            systemctl start libvirtd
+    
+    - name: Configure network settings to use bridge
+      shell: |
+              nmcli con add type bridge ifname br0 && \
+              nmcli con add type bridge-slave ifname eth1 master br0 && \
+              nmcli con modify bridge-br0 ipv4.addresses {{ ansible_eth1.ipv4.address }}/16 && \
+              nmcli con modify bridge-br0 ipv4.gateway 10.47.0.1 && \
+              nmcli con modify bridge-br0 ipv4.dns 10.47.100.5 && \
+              nmcli con modify bridge-br0 ipv4.dns-search arvan.lan && \
+              nmcli con up bridge-slave-eth1
+      
+    - name: Create a mount point for storage backend.
+      file:
+        path: /data/vms
+        state: directory
+        recurse: yes
+      
+    - name: Define storage pool.
+      shell: |
+          virsh pool-define-as \
+            --name vmstorage --type netfs \
+            --source-host 192.168.99.100 --source-path /sharedvol \
+            --source-format auto --target /data/vms
+    
+    - name: Start the pool and make sure it autostart itself.
+      shell: |
+            virsh pool-autostart vmstorage && \
+            virsh pool-start vmstorage
+    
+    - name: Download ubuntu image.
+      shell: |
+          sudo curl -L \
+          http://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img -o /data/vms/focal-server-cloudimg-amd64.qcow2
+      when: "inventory_hostname == groups.compute[0]"
+
+    - name: Clone git repo.
+      ansible.builtin.git:
+        repo: https://github.com/savi0r/Ministack.git
+        dest: /home/centos/Ministack
+
+    - shell: cp -r /home/centos/Ministack/libvirt-scripts /home/centos/
+
+    - name: adding hostnames to /etc/hosts
+      shell: |
+          echo '
+          10.47.100.3 compute01.novalocal
+          10.47.100.4 compute02.novalocal' >> /etc/hosts
+    
+    - name: Installing libvirt exporter.
+      docker_container:
+        name: libvirt-exporter
+        image: bykva/libvirt-exporter:1.0
+        ports:
+          - "9177:9177"
+        volumes: 
+          - /run/libvirt/libvirt-sock-ro:/var/run/libvirt/libvirt-sock-ro:ro
+
+
+
+

@@ -1,0 +1,42 @@
+---
+    - name: downloading docker installation shell script
+      command: curl -fsSL https://get.docker.com -o get-docker.sh
+
+    - name: docker installation
+      command: "sh get-docker.sh"
+
+    - command: "systemctl start docker"
+    - command: "systemctl enable docker"
+    - yum: 
+        name: epel-release
+
+    - name: installing pip
+      yum: 
+        name: python-pip
+
+    - name: installing ansible module for managing docker
+      pip: 
+        name: docker
+
+    - name: Make prometheus configuration file.
+      ansible.builtin.copy:
+        src: ./prometheus.yml
+        dest: /home/centos/prometheus.yml
+    
+    - name: Running prometheus container.
+        docker_container:
+          name: prometheus
+          image: prom/prometheus
+          ports:
+            - "9090:9090" 
+          volumes:
+            - /home/centos/prometheus.yml:/etc/prometheus/prometheus.yml
+
+    - name: Running grafana container.
+        docker_container:
+          name: grafana
+          image: grafana/grafana
+          ports:
+            - "3000:3000" 
+          
+    

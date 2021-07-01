@@ -1,0 +1,54 @@
+---
+    - name: Yum update the system
+      yum:
+        name: "*"
+        state: latest
+        
+    - name: Ensure dnsmasq packages are installed.
+      yum:
+        name:
+          - dnsmasq
+        state: present
+    
+    - name: Ensure iptables packages are installed.
+      yum:
+        name:
+          - iptables-services
+        state: present
+
+    - name: Start & enable dnsmasq service.
+      shell: |
+        systemctl enable dnsmasq && \
+        systemctl start dnsmasq && \
+        sudo systemctl start iptables && \
+        sudo systemctl enable iptables 
+
+    - name: Copy dnsmasq config.
+      ansible.builtin.copy:
+        src: ./dnsmasq.conf
+        dest: /etc/dnsmasq.conf
+        follow: yes
+        
+    - name: Start & enable dnsmasq service.
+      shell: systemctl restart dnsmasq
+
+    - name: Configuring dnsmasq with /etc/resolv.conf File
+      shell: |
+        echo '
+        search openstacklocal novalocal
+        nameserver 127.0.0.1
+        ' > /etc/resolv.conf
+  
+    - name: /etc/resolve.conf write protection
+      shell: chattr +i /etc/resolv.conf
+    
+    - shell: systemctl restart dnsmasq
+
+    - name: Flush iptables existing rules
+      shell: iptables -F
+
+    - name: Set ip masquerade rule
+      shell: iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
+
+    - name: Enable ip forwarding
+      shell: sysctl -w net.ipv4.ip_forward=1

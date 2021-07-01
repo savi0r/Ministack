@@ -1,0 +1,3 @@
+---
+- name: include glusterfs.yml
+  include_tasks: glusterfs.yml

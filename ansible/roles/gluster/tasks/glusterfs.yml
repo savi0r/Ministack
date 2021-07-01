@@ -1,0 +1,199 @@
+---
+    - name: Yum update the system
+      yum:
+        name: "*"
+        state: latest
+        
+    - name: Ensure dependencies are installed.
+      yum:
+        name: centos-release-gluster
+        state: present
+
+    - name: Ensure Gluster packages are installed.
+      yum:
+        name:
+          - glusterfs-server
+        state: present
+
+    - name: Ensure dependencies are installed.
+      yum:
+        name: centos-release-nfs-ganesha30
+        state: present
+
+    - name: Ensure NFS ganesha packages are installed.
+      yum:
+        name:
+          - nfs-ganesha-gluster
+        state: present
+
+    - name: Ensure make utility is installed.
+      yum:
+        name:
+          - make
+        state: present
+        
+    - name: Enable HA repo.
+      shell: yum-config-manager --enable ha
+
+    - name: Ensure clustering utilities are installed.
+      yum:
+        name:
+          - corosync
+          - pacemaker
+          - pcs
+        state: present
+
+    - name: downloading docker installation shell script
+      command: curl -fsSL https://get.docker.com -o get-docker.sh
+
+    - name: docker installation
+      command: "sh get-docker.sh"
+
+    - command: "systemctl start docker"
+    - command: "systemctl enable docker"
+    - yum: 
+        name: epel-release
+
+    - name: installing pip
+      yum: 
+        name: python-pip
+
+    - name: installing ansible module for managing docker
+      pip: 
+        name: docker
+        
+    - name: Create a xfs filesystem on /dev/vdb
+      community.general.filesystem:
+        fstype: xfs
+        dev: /dev/vdb  
+        
+    - name: Create a mount point.
+      file:
+        path: /data/glusterfs/sharedvol/mybrick
+        state: directory
+        recurse: yes
+
+    - name: Add a fstab entry.
+      shell: |
+              echo 'LABEL=gluster-000 /data/glusterfs/sharedvol/mybrick xfs defaults  0 0' >> /etc/fstab
+
+    - name: Mount the filesystem.
+      shell: mount /data/glusterfs/sharedvol/mybrick
+      
+    - name: Enable and start the Gluster service.
+      shell: systemctl enable --now glusterd
+      
+    - name: Create the Gluster environment by adding peers.
+      shell: gluster peer probe master2 && gluster peer probe master3
+      when: "inventory_hostname == groups.gluster[0]"
+      
+    - name: Create Gluster volume.
+      shell: gluster volume create sharedvol replica 3 master{1,2,3}:/data/glusterfs/sharedvol/mybrick/brick
+      when: "inventory_hostname == groups.gluster[0]"
+
+    - name: Ensure Gluster volume is started.
+      shell: gluster volume start sharedvol
+      
+    - name: configure Ganesha
+      shell: |
+              echo 'EXPORT{
+              Export_Id = 1 ;       # Unique identifier for each EXPORT (share)
+              Path = "/sharedvol";  # Export path of our NFS share
+
+              FSAL {
+                  name = GLUSTER;          # Backing type is Gluster
+                  hostname = "localhost";  # Hostname of Gluster server
+                  volume = "sharedvol";    # The name of our Gluster volume
+              }
+
+              Access_type = RW;          # Export access permissions
+              Squash = No_root_squash;   # Control NFS root squashing
+              Disable_ACL = FALSE;       # Enable NFSv4 ACLs
+              Pseudo = "/sharedvol";     # NFSv4 pseudo path for our NFS share
+              Protocols = "3","4" ;      # NFS protocols supported
+              Transports = "UDP","TCP" ; # Transport protocols supported
+              SecType = "sys";           # NFS Security flavors supported
+            }' > /etc/ganesha/ganesha.conf
+      
+    - name: Update hacluster user password.
+      user: 
+        name: hacluster
+        update_password: always 
+        password: examplepassword
+        
+    - name:  Enable the Corosync and Pacemaker services.
+      shell: |
+        systemctl enable corosync && \
+        systemctl enable pacemaker && \
+        systemctl enable --now pcsd
+
+    - name: Authenticate with all cluster nodes using the hacluster user and password
+      shell: pcs host auth master1 master2 master3 -u hacluster -p examplepassword
+      when: "inventory_hostname == groups.gluster[0]"
+      
+    - name:  Create a cluster named HA-NFS 
+      shell: pcs cluster setup HA-NFS master1 master2 master3
+      when: "inventory_hostname == groups.gluster[0]"
+      
+    - name: Start the cluster on all nodes 
+      shell: pcs cluster start --all
+      when: "inventory_hostname == groups.gluster[0]"
+
+    - name: Enable the cluster to run on all nodes at boot time 
+      shell: pcs cluster enable --all
+      when: "inventory_hostname == groups.gluster[0]"
+      
+    - name: Disable STONITH
+      shell: pcs property set stonith-enabled=false
+      when: "inventory_hostname == groups.gluster[0]"
+
+    - name: Create a Pacemaker resource group that contains the resources necessary to host NFS services.
+      shell: pcs resource create nfs_server systemd:nfs-ganesha op monitor interval=10s
+      when: "inventory_hostname == groups.gluster[0]"
+
+    - name: Create a IP cluster resource used to present the NFS server 
+      shell: pcs resource create nfs_ip ocf:heartbeat:IPaddr2 ip=192.168.99.100 cidr_netmask=24 op monitor interval=10s
+      when: "inventory_hostname == groups.gluster[0]"
+      
+    - name: Join the Ganesha service and IP resource in a group to ensure they remain together on the same host.
+      shell: pcs resource group add nfs_group nfs_server nfs_ip
+      when: "inventory_hostname == groups.gluster[0]"
+
+    - name: Downloading & extarcting Go binary
+      ansible.builtin.unarchive:
+        src: https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
+        dest: /usr/local/
+        remote_src: yes
+
+    
+    - name: Setup env variables.
+      shell: |
+        echo 'export GOROOT=/usr/local/go
+              export GOPATH=$HOME/work
+              export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin/' >> /etc/profile 
+    
+    - name: Creating directories
+      shell: |
+              source /etc/profile && \
+              mkdir -p $HOME/work/bin/ && \
+              mkdir -p $GOPATH/src/github.com/gluster
+
+
+    - name: Clone git repo.
+      ansible.builtin.git:
+        repo: https://github.com/gluster/gluster-prometheus.git
+        dest: /home/centos/src/github.com/gluster/gluster-prometheus
+
+    - name: Setup Glusterfs exporter.
+      shell: |
+        /home/centos/src/github.com/gluster/gluster-prometheus/scripts/install-reqs.sh && \
+        make && \
+        make install
+    
+    - name: Start & enable glusterfs exporter.
+      shell: |
+          systemctl enable gluster-exporter && \
+          systemctl start gluster-exporter
+
+
+

@@ -1,0 +1,42 @@
+- hosts: all
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: node_exporter
+
+- hosts: compute
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: virtualization
+
+- hosts: loadbalancer
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: loadbalancer
+
+- hosts: dns
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: DNS
+
+- hosts: gluster
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: gluster
+
+- hosts: dashboard
+  gather_facts: false
+  become: True
+  tasks:
+    - import_role:
+        name: dashboard
+

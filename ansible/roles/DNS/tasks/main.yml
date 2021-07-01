@@ -1,0 +1,3 @@
+---
+- name: include dns.yml
+  include_tasks: dns.yml
