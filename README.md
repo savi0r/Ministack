@@ -969,9 +969,9 @@ https://raw.githubusercontent.com/nginxinc/nginx-prometheus-exporter/master/graf
 
 ## Usage:
 
-You should enter the public ip of loadbalancer in chrome browser - please take note that if you try to use the api in mozilla you will encounter some errors because of the wait time duration of fetch request - for further information check [here](https://dmitripavlutin.com/timeout-fetch-request/) This was the address for me `http://37.152.177.82/docs`
+You should enter the public ip of loadbalancer in chrome browser - please take note that if you try to use the api in mozilla you will encounter some errors because of the wait time duration of fetch request - for further information check [here](https://dmitripavlutin.com/timeout-fetch-request/) This was the address for me `http://37.152.177.82/docs` 
 
-The API looks like this:
+After providing user and password , You would face the API which looks like this:
 
 ![API](img/1.png)
 
