@@ -4,34 +4,37 @@
         name: "*"
         state: latest
 
-    - name: docker installation
-      command: "sh get-docker.sh"
+    - name: Download docker installation shell script
+      get_url:
+        url: https://get.docker.com
+        dest: /get-docker.sh
+        mode: '0555'
 
-    - command: "systemctl start docker"
-    - command: "systemctl enable docker"
-    - yum: 
-        name: epel-release
+    - name: Run docker installation shell script
+      ansible.builtin.script: /get-docker.sh
+
+    - name: Enable docker service, and change the state to start
+      ansible.builtin.service:
+        name: docker
+        enabled: yes
+        state: started
 
     - name: installing pip
       yum: 
-        name: python-pip
+        name: python3-pip
 
     - name: installing ansible module for managing docker
       pip: 
         name: docker
 
-    - name: Ensure nginx packages are installed.
+    - name: Ensure nginx && httpd-tools packages are installed.
       yum:
         name:
           - nginx
-        state: present
-
-    - name: Ensure httpd-tools packages are installed.
-      yum:
-        name:
           - httpd-tools
+
         state: present
-     
+  
     - name: Create credentials folder.
       file:
         path: /etc/apache2
@@ -48,10 +51,11 @@
         follow: yes
         
     - name: Start & enable nginx service.
-      shell: |
-        systemctl enable nginx && \
-        systemctl start nginx
-
+      ansible.builtin.service:
+        name: nginx
+        enabled: yes
+        state: started
+        
     - name: setup Nginx exporter.
       docker_container:
         name: Nginx_exporter

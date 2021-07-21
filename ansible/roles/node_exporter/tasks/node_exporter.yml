@@ -1,17 +1,16 @@
 ---
     - name: Set selinux to permissive mode
-      shell: setenforce 0
+      selinux:
+        policy: targeted
+        state: permissive
       
     - name: Download node exporter
-      shell: |
-        cd /tmp && \
-        curl -LO https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
-        
-    - name: Extract node exporter files.
-      shell: tar -xvf /tmp/node_exporter-1.1.2.linux-amd64.tar.gz
+      ansible.builtin.unarchive:
+        src: https://github.com/prometheus/node_exporter/releases/download/v1.1.2/node_exporter-1.1.2.linux-amd64.tar.gz
+        dest: /usr/local/bin/
+        remote_src: yes
+        extra_opts: [--strip-components=1]
 
-    - name: mv node_exporter-1.1.2.linux-amd64/node_exporter /usr/local/bin/
-      shell: sudo mv node_exporter-1.1.2.linux-amd64/node_exporter /usr/local/bin/
 
     - name: Added a consultant whose account you want to expire
       ansible.builtin.user:
@@ -20,25 +19,31 @@
         system: yes
      
     - name: Create a system unit for node exporter
-      shell: |
-        echo '
-        [Unit]
-        Description=Node Exporter
-        After=network.target
+      blockinfile:
+        path: /etc/systemd/system/node_exporter.service
+        block: |
+          [Unit]
+          Description=Node Exporter
+          After=network.target
 
-        [Service]
-        User=node_exporter
-        Group=node_exporter
-        Type=simple
-        ExecStart=/usr/local/bin/node_exporter --collector.systemd
+          [Service]
+          User=node_exporter
+          Group=node_exporter
+          Type=simple
+          ExecStart=/usr/local/bin/node_exporter --collector.systemd
 
-        [Install]
-        WantedBy=multi-user.target
-        ' > /etc/systemd/system/node_exporter.service
+          [Install]
+          WantedBy=multi-user.target
+        create: true
         
-    - name: Start & enable node exporter service.
-      shell: |
-        systemctl daemon-reload && \
-        systemctl enable node_exporter.service && \
-        systemctl start node_exporter.service
+    - name: force systemd to reread configs
+      ansible.builtin.systemd:
+        daemon_reload: yes
+    
+    - name: Enable and start the cluster services
+      ansible.builtin.service:
+        name: node_exporter.service
+        enabled: yes
+        state: started
+
 

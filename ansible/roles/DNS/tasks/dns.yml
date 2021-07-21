@@ -4,51 +4,62 @@
         name: "*"
         state: latest
         
-    - name: Ensure dnsmasq packages are installed.
+    - name: Ensure dnsmasq & iptables packages are installed.
       yum:
         name:
           - dnsmasq
-        state: present
-    
-    - name: Ensure iptables packages are installed.
-      yum:
-        name:
           - iptables-services
         state: present
+    
+    - name: Enable iptables service, and change the state to start
+      ansible.builtin.service:
+        name: iptables
+        enabled: yes
+        state: started
 
-    - name: Start & enable dnsmasq service.
-      shell: |
-        systemctl enable dnsmasq && \
-        systemctl start dnsmasq && \
-        sudo systemctl start iptables && \
-        sudo systemctl enable iptables 
+    - name: Enable dnsmasq service, and change the state to start
+      ansible.builtin.service:
+        name: dnsmasq
+        enabled: yes
+        state: started
 
     - name: Copy dnsmasq config.
       ansible.builtin.copy:
         src: ./dnsmasq.conf
         dest: /etc/dnsmasq.conf
         follow: yes
-        
-    - name: Start & enable dnsmasq service.
-      shell: systemctl restart dnsmasq
 
     - name: Configuring dnsmasq with /etc/resolv.conf File
-      shell: |
-        echo '
-        search openstacklocal novalocal
-        nameserver 127.0.0.1
-        ' > /etc/resolv.conf
-  
-    - name: /etc/resolve.conf write protection
-      shell: chattr +i /etc/resolv.conf
-    
-    - shell: systemctl restart dnsmasq
+      copy: 
+        content: 'nameserver 127.0.0.1' 
+        dest: /etc/resolv.conf
+
+    - name: Ensure resolv.conf is immutable.
+      file:
+        path: /etc/resolv.conf
+        attr: i
+
+    - name: Restart dnsmasq service
+      ansible.builtin.service:
+        name: dnsmasq
+        state: restarted
 
     - name: Flush iptables existing rules
-      shell: iptables -F
+      ansible.builtin.iptables:
+        chain: "{{ item }}"
+        flush: yes
+      with_items:  [ 'INPUT', 'FORWARD', 'OUTPUT' ]
 
     - name: Set ip masquerade rule
-      shell: iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
+      ansible.builtin.iptables:
+        table: nat
+        chain: POSTROUTING
+        out_interface: eth0
+        jump: MASQUERADE
+      become: yes
 
     - name: Enable ip forwarding
-      shell: sysctl -w net.ipv4.ip_forward=1
+      sysctl:
+          name: net.ipv4.ip_forward
+          value: 1
+          sysctl_set: yes
